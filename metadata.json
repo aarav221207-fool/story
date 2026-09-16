@@ -1,0 +1,6 @@
+{
+  "name": "Worldbound",
+  "description": "An AI-powered open-world anime life and RPG simulator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
