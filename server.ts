@@ -3,8 +3,8 @@ import path from "path";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { createClient } from '@supabase/supabase-js';
+import { getAIClient, getAIModel } from "./ai";
 
 dotenv.config();
 
@@ -17,13 +17,10 @@ app.use(express.json());
 // --- Initialize Supabase ---
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
-let supabase: ReturnType<typeof createClient> | null = null;
+let supabase: any = null;
 if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
 }
-
-// --- Initialize Gemini AI ---
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // --- API Routes ---
 
@@ -31,17 +28,17 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", supabase_configured: !!supabase });
 });
 
-// Seed a new world
+// Seed a new world (JJK Edition)
 app.post("/api/seed-world", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
   try {
     const { data: world, error: worldError } = await supabase
       .from('worlds')
       .insert([{
-        name: "Ethereal Domain",
-        description: "A demon-hunting anime-inspired world.",
-        genre: "Dark Fantasy / Anime Action",
-        setting: "A historical land plagued by supernatural entities.",
+        name: "Jujutsu Kaisen RPG",
+        description: "A persistent open-world Jujutsu Kaisen roleplaying simulator.",
+        genre: "Anime RPG",
+        setting: "Modern Japan with hidden Jujutsu Society",
         day: 1,
         time_of_day: "Morning"
       }])
@@ -52,11 +49,13 @@ app.post("/api/seed-world", async (req, res) => {
 
     // Create locations
     const locations = [
-      { world_id: world.id, name: "Starting Village", region: "South" },
-      { world_id: world.id, name: "Training Grounds", region: "South" },
-      { world_id: world.id, name: "Dark Forest", region: "West" },
-      { world_id: world.id, name: "Mountain Peak", region: "North" },
-      { world_id: world.id, name: "Central Town", region: "Center" }
+      { world_id: world.id, name: "Tokyo Jujutsu High", region: "Tokyo" },
+      { world_id: world.id, name: "Kyoto Jujutsu High", region: "Kyoto" },
+      { world_id: world.id, name: "Training Grounds", region: "Tokyo" },
+      { world_id: world.id, name: "Shibuya", region: "Tokyo" },
+      { world_id: world.id, name: "Shinjuku", region: "Tokyo" },
+      { world_id: world.id, name: "Dormitories", region: "Tokyo" },
+      { world_id: world.id, name: "Abandoned Hospital", region: "Saitama" },
     ];
     
     const { data: insertedLocs, error: locError } = await supabase
@@ -66,32 +65,53 @@ app.post("/api/seed-world", async (req, res) => {
 
     if (locError) throw locError;
 
-    const startVillageId = insertedLocs.find(l => l.name === "Starting Village")?.id;
-    const trainingGroundsId = insertedLocs.find(l => l.name === "Training Grounds")?.id;
+    const tokyoHighId = insertedLocs.find((l: any) => l.name === "Tokyo Jujutsu High")?.id;
+    const trainingGroundsId = insertedLocs.find((l: any) => l.name === "Training Grounds")?.id;
+    const dormsId = insertedLocs.find((l: any) => l.name === "Dormitories")?.id;
 
     // Create characters
     const characters = [
       {
         world_id: world.id,
-        name: "Master Kael",
-        age: 55,
-        appearance: "An older man with graying hair and scars.",
-        background: "A retired demon hunter who now trains the next generation.",
-        personality: "Strict, disciplined, but deeply caring.",
-        occupation: "Mentor",
-        current_location_id: trainingGroundsId,
-        current_activity: "Meditating"
+        name: "Satoru Gojo",
+        age: 28,
+        appearance: "Tall, white hair, blindfold.",
+        background: "The strongest jujutsu sorcerer.",
+        personality: "Playful, arrogant, deeply caring about his students.",
+        occupation: "Teacher",
+        affiliation: "Tokyo Jujutsu High",
+        current_location_id: tokyoHighId,
+        current_activity: "Buying sweets",
+        schedule: { "Morning": tokyoHighId, "Afternoon": trainingGroundsId, "Evening": tokyoHighId, "Night": dormsId },
+        strength: 99, speed: 99, cursed_energy: 99, technique_mastery: 99
       },
       {
         world_id: world.id,
-        name: "Lyra",
-        age: 19,
-        appearance: "Energetic with bright red hair and agile movements.",
-        background: "A fellow trainee eager to prove herself.",
-        personality: "Competitive, loyal, brash.",
-        occupation: "Trainee",
-        current_location_id: startVillageId,
-        current_activity: "Practicing swings"
+        name: "Maki Zenin",
+        age: 16,
+        appearance: "Green hair in a ponytail, glasses.",
+        background: "Rejected by the Zenin clan due to lack of cursed energy, but has heavenly restriction.",
+        personality: "Stubborn, hardworking, blunt, secretly supportive.",
+        occupation: "Student",
+        affiliation: "Tokyo Jujutsu High",
+        current_location_id: trainingGroundsId,
+        current_activity: "Practicing with a polearm",
+        schedule: { "Morning": trainingGroundsId, "Afternoon": tokyoHighId, "Evening": trainingGroundsId, "Night": dormsId },
+        strength: 50, speed: 45, cursed_energy: 0, weapon_proficiency: 80
+      },
+      {
+        world_id: world.id,
+        name: "Megumi Fushiguro",
+        age: 15,
+        appearance: "Spiky dark hair.",
+        background: "Descendant of the Zenin clan, possesses Ten Shadows Technique.",
+        personality: "Stoic, calculating, protective of good people.",
+        occupation: "Student",
+        affiliation: "Tokyo Jujutsu High",
+        current_location_id: tokyoHighId,
+        current_activity: "Reading",
+        schedule: { "Morning": tokyoHighId, "Afternoon": trainingGroundsId, "Evening": tokyoHighId, "Night": dormsId },
+        strength: 30, speed: 35, cursed_energy: 40, technique_mastery: 40
       }
     ];
 
@@ -108,16 +128,22 @@ app.post("/api/seed-world", async (req, res) => {
 app.post("/api/create-player", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
   try {
-    const { world_id, name } = req.body;
+    const { world_id, name, age, appearance, background, affiliation, cursed_technique, personal_goal } = req.body;
     
-    // get starting village
-    const { data: locs } = await supabase.from('locations').select('id').eq('world_id', world_id).eq('name', 'Starting Village').single();
+    // get starting location
+    const { data: locs } = await supabase.from('locations').select('id').eq('world_id', world_id).eq('name', 'Tokyo Jujutsu High').single();
     
     const { data: player, error } = await supabase
       .from('players')
       .insert([{
         world_id,
         name,
+        age: age || 16,
+        appearance: appearance || "Standard uniform",
+        background: background || "Unknown",
+        affiliation: affiliation || "Tokyo Jujutsu High",
+        cursed_technique: cursed_technique || "None",
+        personal_goal: personal_goal || "Become a strong sorcerer",
         location_id: locs?.id
       }])
       .select()
@@ -130,86 +156,103 @@ app.post("/api/create-player", async (req, res) => {
   }
 });
 
+// Calculate Time Advancement
+function advanceTime(currentDay: number, currentTime: string, durationMinutes: number) {
+  const times = ["Morning", "Afternoon", "Evening", "Night"];
+  let currentIndex = times.indexOf(currentTime);
+  
+  // Very simple approximation: 4 phases a day, say ~6 hours each.
+  let phasesToAdvance = Math.floor(durationMinutes / (6 * 60));
+  if (durationMinutes > 0 && phasesToAdvance === 0) phasesToAdvance = 1; // at least 1 phase for short actions that take 'some' time
+
+  let newIndex = (currentIndex + phasesToAdvance) % times.length;
+  let daysPassed = Math.floor((currentIndex + phasesToAdvance) / times.length);
+  
+  return {
+    newDay: currentDay + daysPassed,
+    newTime: times[newIndex]
+  };
+}
+
 // Action Director
 app.post("/api/action", async (req, res) => {
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
   try {
     const { player_id, action_text } = req.body;
+    const ai = getAIClient();
+    const model = getAIModel();
 
     // 1. Fetch player & world state
-    const { data: player } = await supabase.from('players').select('*, locations(name)').eq('id', player_id).single();
+    const { data: player } = await supabase.from('players').select('*, locations(*)').eq('id', player_id).single();
     if (!player) return res.status(404).json({ error: "Player not found" });
 
     const { data: world } = await supabase.from('worlds').select('*').eq('id', player.world_id).single();
     
-    // Fetch NPCs in same location
-    const { data: npcs } = await supabase.from('characters').select('id, name, current_activity, personality').eq('current_location_id', player.location_id);
-    
-    // Fetch available locations for travel
-    const { data: allLocations } = await supabase.from('locations').select('id, name').eq('world_id', world.id);
+    const { data: npcs } = await supabase.from('characters').select('id, name, current_location_id, current_activity, personality, affiliation').eq('world_id', world.id);
+    const { data: relationships } = await supabase.from('relationships').select('*').eq('target_id', player.id);
+    const { data: allLocations } = await supabase.from('locations').select('id, name, region').eq('world_id', world.id);
+    const { data: recentMemories } = await supabase.from('memories').select('content, type').eq('player_id', player.id).order('created_at', { ascending: false }).limit(5);
 
     // 2. AI Interpretation (The Director)
-    const directorSchema = {
-      type: Type.OBJECT,
-      properties: {
-        action_type: { type: Type.STRING, description: "One of: TRAVEL, TRAIN, TALK, EXPLORE, REST, COMBAT, INVALID" },
-        target_location_id: { type: Type.STRING, nullable: true },
-        target_character_id: { type: Type.STRING, nullable: true },
-        duration_hours: { type: Type.INTEGER, description: "Hours this action takes" },
-        stamina_cost: { type: Type.INTEGER, description: "Stamina consumed by this action" },
-        narration: { type: Type.STRING, description: "A highly descriptive, atmospheric narration of what happens and the outcome. Min 2 sentences." },
-        is_impossible: { type: Type.BOOLEAN, description: "True if the action makes no physical/logical sense in the current context." },
-        impossible_reason: { type: Type.STRING, nullable: true, description: "Why it's impossible, if applicable." },
-        npc_relationship_changes: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              character_id: { type: Type.STRING },
-              friendship_change: { type: Type.INTEGER }
-            }
-          }
-        },
-        memory_to_create: {
-          type: Type.OBJECT,
-          nullable: true,
-          properties: {
-            character_id: { type: Type.STRING },
-            content: { type: Type.STRING, description: "Important fact to remember." },
-            importance: { type: Type.INTEGER }
-          }
-        }
-      },
-      required: ["action_type", "duration_hours", "stamina_cost", "narration", "is_impossible"]
-    };
-
     const prompt = `
-      You are the AI Director for an anime RPG simulation.
-      Interpret the player's action and output structured results.
-      
-      WORLD: ${world.name} (Day ${world.day}, ${world.time_of_day})
-      PLAYER: ${player.name} (Health: ${player.health}, Stamina: ${player.stamina})
-      CURRENT LOCATION: ${player.locations?.name}
-      NEARBY NPCS: ${JSON.stringify(npcs)}
-      AVAILABLE LOCATIONS: ${JSON.stringify(allLocations)}
-      
-      PLAYER INTENT: "${action_text}"
-      
-      Determine what type of action this is. If it involves a known NPC, link their ID. If travel to a known location, link ID.
-      Narrate the outcome beautifully.
-    `;
+You are the AI Director for a Jujutsu Kaisen RPG simulation.
+Your job is to interpret the player's free-text action and output a structured JSON response.
 
-    const response = await ai.models.generateContent({
-      model: process.env.AI_MODEL || "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: directorSchema as Schema,
-        temperature: 0.7
-      }
+WORLD STATE:
+Day: ${world.day}, Time: ${world.time_of_day}, Weather: ${world.weather}
+
+PLAYER STATE:
+Name: ${player.name}
+Location: ${player.locations?.name} (${player.locations?.region})
+Stats: Health ${player.health}/${player.max_health}, Stamina ${player.stamina}/${player.max_stamina}, Cursed Energy ${player.cursed_energy}/${player.max_cursed_energy}
+Technique: ${player.cursed_technique}
+
+ALL LOCATIONS: ${JSON.stringify(allLocations.map((l:any) => ({id: l.id, name: l.name})))}
+
+ALL NPCS: ${JSON.stringify(npcs.map((n:any) => ({id: n.id, name: n.name, location: allLocations.find((l:any)=>l.id === n.current_location_id)?.name, activity: n.current_activity})))}
+
+PLAYER'S RELATIONSHIPS: ${JSON.stringify(relationships)}
+
+RECENT MEMORIES: ${JSON.stringify(recentMemories)}
+
+PLAYER INTENT: "${action_text}"
+
+Based on the intent, determine what happens.
+- If the player tries to do something impossible (e.g. travel to a place that doesn't exist, attack someone not there), set is_impossible: true.
+- If they want to travel, set target_location_id.
+- If they interact with an NPC, specify target_character_id and how the relationship changes.
+- Determine duration_minutes (e.g., traveling might take 60-120 mins, training 180 mins, talking 15 mins).
+- Calculate stamina/health/energy costs. Training uses stamina/energy. Resting restores them.
+- Provide a rich narrative of the outcome in the 'narration' field.
+- If important, create a memory.
+
+Respond ONLY with valid JSON using the following schema (no markdown blocks):
+{
+  "action_type": "string (e.g. TRAVEL, TRAIN, TALK, EXPLORE, REST, COMBAT, OTHER)",
+  "target_location_id": "uuid or null",
+  "target_character_id": "uuid or null",
+  "duration_minutes": 0,
+  "stamina_cost": 0,
+  "health_cost": 0,
+  "cursed_energy_cost": 0,
+  "stat_changes": { "strength": 0, "speed": 0, "technique_mastery": 0, "cursed_energy_control": 0 },
+  "npc_relationship_changes": [ { "character_id": "uuid", "friendship_change": 0, "respect_change": 0, "trust_change": 0 } ],
+  "memory_to_create": { "character_id": "uuid", "content": "summary of event", "type": "episodic", "importance": 5 },
+  "narration": "detailed narrative string",
+  "is_impossible": false,
+  "impossible_reason": ""
+}
+`;
+
+    const chatCompletion = await ai.chat.completions.create({
+      model: model,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
     });
 
-    const result = JSON.parse(response.text || '{}');
+    const resultString = chatCompletion.choices[0]?.message?.content || '{}';
+    const result = JSON.parse(resultString);
 
     if (result.is_impossible) {
       return res.json({ 
@@ -221,56 +264,108 @@ app.post("/api/action", async (req, res) => {
 
     // 3. Apply state changes (Authoritative Engine)
     
-    // Update player stamina
-    let newStamina = Math.max(0, player.stamina - (result.stamina_cost || 0));
-    let updatePayload: any = { stamina: newStamina };
+    // Calculate new stats
+    let newStamina = Math.max(0, Math.min(player.max_stamina, player.stamina - (result.stamina_cost || 0)));
+    let newHealth = Math.max(0, Math.min(player.max_health, player.health - (result.health_cost || 0)));
+    let newCE = Math.max(0, Math.min(player.max_cursed_energy, player.cursed_energy - (result.cursed_energy_cost || 0)));
+    
+    let updatePayload: any = { 
+      stamina: newStamina,
+      health: newHealth,
+      cursed_energy: newCE
+    };
 
     if (result.action_type === 'REST') {
        updatePayload.stamina = player.max_stamina;
        updatePayload.health = player.max_health;
+       updatePayload.cursed_energy = player.max_cursed_energy;
     }
 
     if (result.action_type === 'TRAVEL' && result.target_location_id) {
        updatePayload.location_id = result.target_location_id;
     }
+    
+    // Apply stat growths if any
+    if (result.stat_changes) {
+      for (const key of Object.keys(result.stat_changes)) {
+         if (player[key] !== undefined && typeof result.stat_changes[key] === 'number') {
+            updatePayload[key] = player[key] + result.stat_changes[key];
+         }
+      }
+    }
 
     await supabase.from('players').update(updatePayload).eq('id', player.id);
 
     // Update time
-    // simplified: just advance time of day arbitrarily for now based on duration
-    let newTime = world.time_of_day;
-    if (result.duration_hours > 0) {
-       const times = ["Morning", "Afternoon", "Evening", "Night"];
-       let currentIndex = times.indexOf(world.time_of_day);
-       let nextIndex = (currentIndex + 1) % times.length;
-       newTime = times[nextIndex];
-       
-       let newDay = world.day;
-       if (nextIndex < currentIndex) {
-         newDay += 1; // rolled over to next day
-       }
-       await supabase.from('worlds').update({ time_of_day: newTime, day: newDay }).eq('id', world.id);
+    const { newDay, newTime } = advanceTime(world.day, world.time_of_day, result.duration_minutes || 15);
+    await supabase.from('worlds').update({ time_of_day: newTime, day: newDay }).eq('id', world.id);
+
+    // Process Relationship Changes
+    if (result.npc_relationship_changes && result.npc_relationship_changes.length > 0) {
+      for (const change of result.npc_relationship_changes) {
+         if (!change.character_id) continue;
+         
+         const { data: existingRel } = await supabase.from('relationships')
+           .select('*')
+           .eq('character_id', change.character_id)
+           .eq('target_id', player.id)
+           .single();
+           
+         if (existingRel) {
+            let newFriendship = existingRel.friendship + (change.friendship_change || 0);
+            let newRespect = existingRel.respect + (change.respect_change || 0);
+            let newTrust = existingRel.trust + (change.trust_change || 0);
+            
+            let newStatus = existingRel.status;
+            if (newFriendship > 60) newStatus = "Close Friend";
+            else if (newFriendship > 30) newStatus = "Friendly";
+            else if (newFriendship > 15) newStatus = "Acquaintance";
+            
+            await supabase.from('relationships').update({
+              friendship: newFriendship,
+              respect: newRespect,
+              trust: newTrust,
+              status: newStatus
+            }).eq('id', existingRel.id);
+         } else {
+            let newStatus = "Acquaintance";
+            let f = change.friendship_change || 0;
+            if (f > 30) newStatus = "Friendly";
+            
+            await supabase.from('relationships').insert({
+              world_id: world.id,
+              character_id: change.character_id,
+              target_id: player.id,
+              target_type: 'player',
+              friendship: f,
+              respect: change.respect_change || 0,
+              trust: change.trust_change || 0,
+              status: newStatus
+            });
+         }
+      }
     }
 
     // Memory
-    if (result.memory_to_create && result.memory_to_create.character_id) {
+    if (result.memory_to_create && result.memory_to_create.content && result.memory_to_create.character_id) {
        await supabase.from('memories').insert({
          world_id: world.id,
+         player_id: player.id,
          character_id: result.memory_to_create.character_id,
-         type: 'episodic',
-         importance: result.memory_to_create.importance || 1,
+         type: result.memory_to_create.type || 'episodic',
+         importance: result.memory_to_create.importance || 5,
          content: result.memory_to_create.content
        });
     }
 
-    // Record Action
+    // Record Action History
     await supabase.from('actions_history').insert({
       world_id: world.id,
       player_id: player.id,
       action_text,
       narration: result.narration,
-      day: world.day,
-      time_of_day: world.time_of_day
+      day: newDay,
+      time_of_day: newTime
     });
 
     res.json({
@@ -295,10 +390,15 @@ app.get("/api/state/:playerId", async (req, res) => {
     if (!player) return res.status(404).json({ error: "Player not found" });
 
     const { data: world } = await supabase.from('worlds').select('*').eq('id', player.world_id).single();
+    
+    // We fetch NPCs at the same location to display
     const { data: npcs } = await supabase.from('characters').select('*').eq('current_location_id', player.location_id);
-    const { data: history } = await supabase.from('actions_history').select('*').eq('player_id', player.id).order('created_at', { ascending: false }).limit(5);
+    
+    const { data: history } = await supabase.from('actions_history').select('*').eq('player_id', player.id).order('created_at', { ascending: false }).limit(20);
 
-    res.json({ player, world, npcs, recent_history: history.reverse() });
+    const { data: relationships } = await supabase.from('relationships').select('*, characters(name)').eq('target_id', player.id);
+
+    res.json({ player, world, npcs, recent_history: history.reverse(), relationships });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
